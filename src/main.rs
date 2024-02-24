@@ -63,7 +63,7 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
 
     loop {
         tokio::select! {
-            msg = read.next() => {
+            _msg = read.next() => {
                 println!("Recieved message");
             }
         }
