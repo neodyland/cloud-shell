@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
 
 async fn ws_handler(stream: TcpStream) -> anyhow::Result<()> {
     let ws = accept_async(stream).await?;
-    let (mut write, read) = ws.split();
+    let (mut write, _read) = ws.split();
     write
         .send(json_to_msg(&types::HelloMessage {
             op: 1,
