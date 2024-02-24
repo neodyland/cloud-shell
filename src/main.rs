@@ -1,6 +1,7 @@
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
+use kube::Client;
 
 mod types;
 
