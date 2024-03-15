@@ -122,7 +122,7 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
                 match op {
                     3 => {
                         println!("Running command: {:?}", msg["data"]);
-                        let data = msg["data"].as_str().unwrap();
+                        let data = msg["data"].as_str().unwrap_or("");
                         stdin_writer.write_all(data.as_bytes()).await?;
                         println!("Sent: {}", data);
                     }
