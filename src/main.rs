@@ -1,10 +1,17 @@
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use k8s_openapi::{
     api::core::v1::{Container, Pod, PodSpec},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
-use kube::{core::params::PostParams, Api, Client};
-use tokio::net::{TcpListener, TcpStream};
+use kube::{
+    api::WatchParams,
+    core::{params::PostParams, subresource::AttachParams, WatchEvent},
+    Api, Client, ResourceExt,
+};
+use tokio::{
+    io::AsyncWriteExt,
+    net::{TcpListener, TcpStream},
+};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 
 mod types;
@@ -60,11 +67,62 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
         },
     )
     .await?;
+    write
+        .send(json_to_msg(&types::ReadyMessage { op: 2, data: None })?)
+        .await?;
+
+    let wp = WatchParams::default()
+        .fields("metadata.name=shell-pod")
+        .timeout(10);
+    let mut watch = pods.watch(&wp, "0").await?.boxed();
+    while let Some(status) = watch.try_next().await? {
+        match status {
+            WatchEvent::Added(pod) => {
+                println!("Added: {}", pod.name_any());
+            }
+            WatchEvent::Modified(pod) => {
+                println!("Modified: {}", pod.name_any());
+                let status = pod.status.as_ref().unwrap();
+                if status.phase.as_deref() == Some("Running") {
+                    break;
+                }
+                write
+                    .send(json_to_msg(&types::ReadyMessage { op: 2, data: None })?)
+                    .await?;
+            }
+            _ => {}
+        }
+    }
+
+    let mut attached = pods
+        .exec(
+            "/bin/bash",
+            vec!["/bin/bash"],
+            &AttachParams {
+                tty: true,
+                stdin: true,
+                ..Default::default()
+            },
+        )
+        .await?;
 
     loop {
         tokio::select! {
-            _msg = read.next() => {
-                println!("Recieved message");
+            msg = read.next() => {
+                let msg = if let Some(Ok(Message::Text(msg))) = msg {
+                    msg
+                } else {
+                    continue;
+                };
+                let msg: serde_json::Value = serde_json::from_str(&msg)?;
+                let op = msg["op"].as_u64().unwrap();
+                match op {
+                    3 => {
+                        let data = msg["data"].as_str().unwrap();
+                        attached.stdin().unwrap().write_all(data.as_bytes()).await?;
+                    }
+                    _ => {}
+                }
             }
         }
     }

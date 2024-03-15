@@ -17,3 +17,9 @@ pub struct ReadyMessage {
     pub op: u8,
     pub data: Option<u8>,
 }
+
+#[derive(Serialize)]
+pub struct RunCommandMessage {
+    pub op: u8,
+    pub data: String,
+}
