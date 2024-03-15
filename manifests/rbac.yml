@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cloud-shell-role
+  namespace: shell
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cloud-shell-role-binding
+  namespace: shell
+subjects:
+  - kind: ServiceAccount
+    name: cloud-shell-service-account
+    namespace: shell
+roleRef:
+  kind: Role
+  name: cloud-shell-role
+  apiGroup: rbac.authorization.k8s.io

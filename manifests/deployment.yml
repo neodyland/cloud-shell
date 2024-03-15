@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-shell-deployment
+  namespace: shell
+  labels:
+    app: cloud-shell
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloud-shell
+  template:
+    metadata:
+      labels:
+        app: cloud-shell
+    spec:
+      containers:
+      - name: cloud-shell
+        image: ghcr.io/tuna2134/cloud-shell
+        ports:
+        - containerPort: 8000
+      serviceAccountName: cloud-shell-service-account
