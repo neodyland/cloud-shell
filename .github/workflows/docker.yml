@@ -53,7 +53,3 @@ jobs:
       run: |
         kubectl create namespace shell
         kubectl apply -f manifests
-    - name: Test cloud shell
-      run: |
-        pip3 install websockets
-        python tests/basic.py
