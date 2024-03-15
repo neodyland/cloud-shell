@@ -41,7 +41,7 @@ jobs:
       run: |
         curl -sfL https://get.k3s.io | sh - 
         sudo kubectl version
-    - name: Test cloud shell
+    - name: Deploy cloud shell
       run: |
         sudo kubectl create namespace shell
         sudo kubectl apply -f manifests
