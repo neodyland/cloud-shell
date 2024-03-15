@@ -12,9 +12,10 @@ use kube::{
 };
 use tokio::{
     io::AsyncWriteExt,
-    net::{TcpListener, TcpStream},
+    net::TcpListener,
 };
-use tokio_tungstenite::{accept_async, tungstenite::Message};
+// use tokio_tungstenite::{accept_async, tungstenite::Message};
+use axum::{extract::{WebSocketUpgrade, State, ws::{WebSocket, Message}}, response::IntoResponse, routing::get, Router};
 
 mod types;
 
@@ -26,6 +27,11 @@ where
     Ok(Message::Text(msg))
 }
 
+#[derive(Clone)]
+struct AppState {
+    client: Client,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing::info!("Now booting...");
@@ -33,21 +39,35 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind("0.0.0.0:8000").await?;
     let client = Client::try_default().await?;
 
-    loop {
-        let (stream, _) = listener.accept().await?;
-        tokio::spawn(wrapper(stream, client.clone()));
-    }
+    let app = Router::new()
+        .route("/", get(|| async { "Hello, World!"}))
+        .route("/ws", get(ws_handle))
+        .with_state(AppState { client: client.clone() });
+
+    axum::serve(listener, app).await?;
+
     Ok(())
 }
 
+async fn ws_handle(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| wrapper(socket, state.client))
+}
+
+/*
 async fn wrapper(stream: TcpStream, client: Client) {
-    if let Err(e) = ws_handler(stream, client).await {
+    if let Err(e) = handle_socket(stream, client).await {
+        tracing::error!("{:?}", e);
+    }
+}
+*/
+
+async fn wrapper(ws: WebSocket, client: Client) {
+    if let Err(e) = handle_socket(ws, client).await {
         tracing::error!("{:?}", e);
     }
 }
 
-async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
-    let ws = accept_async(stream).await?;
+async fn handle_socket(ws: WebSocket, client: Client) -> anyhow::Result<()> {
     let (mut write, mut read) = ws.split();
     write
         .send(json_to_msg(&types::HelloMessage {
