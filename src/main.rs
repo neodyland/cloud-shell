@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, env};
 
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use k8s_openapi::{
@@ -28,7 +28,8 @@ where
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    println!("Hello, world!");
+    tracing::info!("Now booting...");
+    dotenvy::dotenv().ok();
     let listener = TcpListener::bind("0.0.0.0:8000").await?;
     let client = Client::try_default().await?;
 
@@ -51,7 +52,10 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
     let pods: Api<Pod> = Api::namespaced(client, "shell");
     let pod_name = format!("shell-pod-{}", uuid::Uuid::new_v4()).to_string();
     let mut resource_limits = BTreeMap::new();
-    resource_limits.insert("cpu".to_string(), Quantity("0.5Gi".to_string()));
+    resource_limits.insert(
+        "memory".to_string(),
+        Quantity(env::var("MEMORY_LIMIT").unwrap_or("1Gi".to_string())),
+    );
     pods.create(
         &PostParams::default(),
         &Pod {
@@ -64,12 +68,10 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
                     name: "shell".to_string(),
                     image: Some("archlinux".to_string()),
                     command: Some(vec!["sleep".to_string(), "infinity".to_string()]),
-                    resources: Some(
-                        ResourceRequirements {
-                            limits: Some(resource_limits),
-                            ..Default::default()
-                        },
-                    ),
+                    resources: Some(ResourceRequirements {
+                        limits: Some(resource_limits),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }],
                 ..Default::default()
@@ -85,13 +87,13 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
     while let Some(status) = watch.try_next().await? {
         match status {
             WatchEvent::Added(pod) => {
-                println!("Added: {}", pod.name_any());
+                tracing::info!("Added: {}", pod.name_any());
             }
             WatchEvent::Modified(pod) => {
-                println!("Modified: {:?}", pod.name_any());
+                tracing::info!("Modified: {:?}", pod.name_any());
                 let status = pod.status.as_ref().unwrap();
                 if status.phase.as_deref() == Some("Running") {
-                    println!("Pod is running");
+                    tracing::info!("Pod is running");
                     break;
                 }
             }
@@ -102,7 +104,7 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
         .send(json_to_msg(&types::ReadyMessage { op: 2, data: None })?)
         .await?;
 
-    println!("Pod is running, attaching to it");
+    tracing::debug!("Pod is running, attaching to it");
     let mut attached = pods
         .exec(
             &pod_name,
@@ -120,7 +122,7 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
     loop {
         tokio::select! {
             msg = read.next() => {
-                println!("Received message: {:?}", msg);
+                tracing::debug!("Received message: {:?}", msg);
                 let msg = match msg {
                     Some(Ok(Message::Text(msg))) => msg,
                     Some(Ok(Message::Close(_))) => break,
@@ -131,7 +133,7 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
                 let op = msg["op"].as_u64().unwrap();
                 match op {
                     3 => {
-                        println!("Running command: {:?}", msg["data"]);
+                        tracing::debug!("Running command: {:?}", msg["data"]);
                         let data = msg["data"].as_str().unwrap_or("");
                         stdin_writer.write_all(data.as_bytes()).await?;
                     }
