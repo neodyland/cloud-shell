@@ -35,13 +35,15 @@ async fn main() -> anyhow::Result<()> {
 
     loop {
         let (stream, _) = listener.accept().await?;
-        tokio::spawn(async move {
-            if let Err(e) = ws_handler(stream, client.clone()).await {
-                tracing::error!("Error: {:?}", e);
-            }
-        }.clone());
+        tokio::spawn(wrapper(stream, client.clone()));
     }
     Ok(())
+}
+
+async fn wrapper(stream: TcpStream, client: Client) {
+    if let Err(e) = ws_handler(stream, client).await {
+        tracing::error!("{:?}", e);
+    }
 }
 
 async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
