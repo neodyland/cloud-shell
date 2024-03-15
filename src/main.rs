@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
             if let Err(e) = ws_handler(stream, client.clone()).await {
                 tracing::error!("Error: {:?}", e);
             }
-        });
+        }.clone());
     }
     Ok(())
 }
