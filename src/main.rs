@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
+
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use k8s_openapi::{
-    api::core::v1::{Container, Pod, PodSpec},
-    apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    api::core::v1::{Container, Pod, PodSpec, ResourceRequirements},
+    apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 use kube::{
     api::WatchParams,
@@ -48,6 +50,8 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
         .await?;
     let pods: Api<Pod> = Api::namespaced(client, "shell");
     let pod_name = format!("shell-pod-{}", uuid::Uuid::new_v4()).to_string();
+    let mut resource_limits = BTreeMap::new();
+    resource_limits.insert("cpu".to_string(), Quantity("0.5Gi".to_string()));
     pods.create(
         &PostParams::default(),
         &Pod {
@@ -60,6 +64,12 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
                     name: "shell".to_string(),
                     image: Some("archlinux".to_string()),
                     command: Some(vec!["sleep".to_string(), "infinity".to_string()]),
+                    resources: Some(
+                        ResourceRequirements {
+                            limits: Some(resource_limits),
+                            ..Default::default()
+                        },
+                    ),
                     ..Default::default()
                 }],
                 ..Default::default()
