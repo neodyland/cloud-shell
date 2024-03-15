@@ -15,7 +15,7 @@ async def hello():
                 ready = True
                 await ws.send(json.dumps({
                     "op": 3,
-                    "data": "pacman -Syyu\n"
+                    "data": "help\n"
                 }))
             elif data["op"] == 4:
                 print(data["data"])
