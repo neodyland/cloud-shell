@@ -67,10 +67,6 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
         },
     )
     .await?;
-    write
-        .send(json_to_msg(&types::ReadyMessage { op: 2, data: None })?)
-        .await?;
-
     let wp = WatchParams::default()
         .fields("metadata.name=shell-pod")
         .timeout(10);
