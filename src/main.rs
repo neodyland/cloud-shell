@@ -15,7 +15,6 @@ use tokio::{
     net::TcpListener,
 };
 use tracing_subscriber::{fmt::time::LocalTime, EnvFilter};
-// use tokio_tungstenite::{accept_async, tungstenite::Message};
 use axum::{extract::{WebSocketUpgrade, State, ws::{WebSocket, Message}}, response::IntoResponse, routing::get, Router};
 
 mod types;
