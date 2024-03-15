@@ -47,11 +47,12 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
         })?)
         .await?;
     let pods: Api<Pod> = Api::namespaced(client, "shell");
+    let pod_name = format!("shell-pod-{}", uuid::Uuid::new_v4()).to_string();
     pods.create(
         &PostParams::default(),
         &Pod {
             metadata: ObjectMeta {
-                name: Some("shell-pod".to_string()),
+                name: Some(pod_name.clone()),
                 ..Default::default()
             },
             spec: Some(PodSpec {
@@ -68,7 +69,7 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
     )
     .await?;
     let wp = WatchParams::default()
-        .fields("metadata.name=shell-pod")
+        .fields(&format!("metadata.name={}", pod_name))
         .timeout(10);
     let mut watch = pods.watch(&wp, "0").await?.boxed();
     while let Some(status) = watch.try_next().await? {
@@ -77,9 +78,10 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
                 println!("Added: {}", pod.name_any());
             }
             WatchEvent::Modified(pod) => {
-                println!("Modified: {}", pod.name_any());
+                println!("Modified: {:?}", pod.name_any());
                 let status = pod.status.as_ref().unwrap();
                 if status.phase.as_deref() == Some("Running") {
+                    println!("Pod is running");
                     break;
                 }
             }
@@ -90,37 +92,56 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
         .send(json_to_msg(&types::ReadyMessage { op: 2, data: None })?)
         .await?;
 
+    println!("Pod is running, attaching to it");
     let mut attached = pods
         .exec(
-            "/bin/bash",
+            &pod_name,
             vec!["/bin/bash"],
             &AttachParams {
                 tty: true,
                 stdin: true,
+                stderr: false,
                 ..Default::default()
             },
         )
         .await?;
-
+    let mut stdout_stream = tokio_util::io::ReaderStream::new(attached.stdout().unwrap());
+    let mut stdin_writer = attached.stdin().unwrap();
     loop {
         tokio::select! {
             msg = read.next() => {
-                let msg = if let Some(Ok(Message::Text(msg))) = msg {
-                    msg
-                } else {
-                    continue;
+                println!("Received message: {:?}", msg);
+                let msg = match msg {
+                    Some(Ok(Message::Text(msg))) => msg,
+                    Some(Ok(Message::Close(_))) => break,
+                    None => break,
+                    _ => continue,
                 };
                 let msg: serde_json::Value = serde_json::from_str(&msg)?;
                 let op = msg["op"].as_u64().unwrap();
                 match op {
                     3 => {
+                        println!("Running command: {:?}", msg["data"]);
                         let data = msg["data"].as_str().unwrap();
-                        attached.stdin().unwrap().write_all(data.as_bytes()).await?;
+                        stdin_writer.write_all(data.as_bytes()).await?;
+                        println!("Sent: {}", data);
                     }
                     _ => {}
                 }
             }
+            stdout = stdout_stream.try_next() => {
+                let stdout = match stdout {
+                    Ok(Some(stdout)) => stdout,
+                    _ => break,
+                };
+                write.send(json_to_msg(&types::RunCommandMessage {
+                    op: 4,
+                    data: String::from_utf8_lossy(&stdout).to_string(),
+                })?).await?;
+            }
         }
     }
+    pods.delete(&pod_name, &Default::default()).await?;
+
     Ok(())
 }

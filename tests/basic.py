@@ -6,17 +6,19 @@ import json
 async def hello():
     async with websockets.connect("ws://localhost:8000") as ws:
         print(await ws.recv())
-        await ws.send("Hello, World!")
         ready = False
+        data = json.loads(await ws.recv())
         while ws.open:
             data = json.loads(await ws.recv())
             if data["op"] == 2:
                 print("Ready")
                 ready = True
                 await ws.send(json.dumps({
-                    "op": 4,
-                    "data": "help"
+                    "op": 3,
+                    "data": "pacman -Syyu\n"
                 }))
+            elif data["op"] == 4:
+                print(data["data"])
 
 
 asyncio.run(hello())
