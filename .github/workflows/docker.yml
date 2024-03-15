@@ -37,6 +37,9 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
     - name: Install k3s
       run: |
         curl -sfL https://get.k3s.io | sh -
@@ -50,3 +53,7 @@ jobs:
       run: |
         kubectl create namespace shell
         kubectl apply -f manifests
+    - name: Test cloud shell
+      run: |
+        sleep 20
+        python tests/basic.py
