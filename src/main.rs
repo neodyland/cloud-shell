@@ -80,7 +80,7 @@ async fn handle_socket(ws: WebSocket, client: Client) -> anyhow::Result<()> {
     let mut resource_limits = BTreeMap::new();
     resource_limits.insert(
         "memory".to_string(),
-        Quantity(env::var("MEMORY_LIMIT").unwrap_or("1Gi".to_string())),
+        Quantity(env::var("MEMORY_LIMIT").unwrap_or("0.1Gi".to_string())),
     );
     pods.create(
         &PostParams::default(),
