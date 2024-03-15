@@ -59,14 +59,6 @@ async fn ws_handle(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl 
     ws.on_upgrade(move |socket| wrapper(socket, state.client))
 }
 
-/*
-async fn wrapper(stream: TcpStream, client: Client) {
-    if let Err(e) = handle_socket(stream, client).await {
-        tracing::error!("{:?}", e);
-    }
-}
-*/
-
 async fn wrapper(ws: WebSocket, client: Client) {
     if let Err(e) = handle_socket(ws, client).await {
         tracing::error!("{:?}", e);
