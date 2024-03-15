@@ -14,7 +14,7 @@ async def hello():
                 print("Ready")
                 await ws.send(json.dumps({
                     "op": 3,
-                    "data": "pacman -Syyu --noconfirm neofetch\n"
+                    "data": "pacman -Syyu --noconfirm neofetch && neofetch\n"
                 }))
             if data["op"] == 4:
                 print(data["data"])
