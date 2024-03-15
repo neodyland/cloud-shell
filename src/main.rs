@@ -14,6 +14,7 @@ use tokio::{
     io::AsyncWriteExt,
     net::TcpListener,
 };
+use tracing_subscriber::{fmt::time::LocalTime, EnvFilter};
 // use tokio_tungstenite::{accept_async, tungstenite::Message};
 use axum::{extract::{WebSocketUpgrade, State, ws::{WebSocket, Message}}, response::IntoResponse, routing::get, Router};
 
@@ -36,6 +37,12 @@ struct AppState {
 async fn main() -> anyhow::Result<()> {
     tracing::info!("Now booting...");
     dotenvy::dotenv().ok();
+    tracing_subscriber::fmt()
+        .with_timer(LocalTime::rfc_3339())
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_file(true)
+        .with_line_number(true)
+        .init();
     let listener = TcpListener::bind("0.0.0.0:8000").await?;
     let client = Client::try_default().await?;
 
