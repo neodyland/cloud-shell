@@ -20,4 +20,7 @@ spec:
         image: ghcr.io/tuna2134/cloud-shell
         ports:
         - containerPort: 8000
+        env:
+        - name: MEMORY_LIMIT
+          value: 0.1Gi
       serviceAccountName: cloud-shell-service-account
