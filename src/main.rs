@@ -86,13 +86,13 @@ async fn ws_handler(stream: TcpStream, client: Client) -> anyhow::Result<()> {
                 if status.phase.as_deref() == Some("Running") {
                     break;
                 }
-                write
-                    .send(json_to_msg(&types::ReadyMessage { op: 2, data: None })?)
-                    .await?;
             }
             _ => {}
         }
     }
+    write
+        .send(json_to_msg(&types::ReadyMessage { op: 2, data: None })?)
+        .await?;
 
     let mut attached = pods
         .exec(
