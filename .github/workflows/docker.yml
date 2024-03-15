@@ -55,5 +55,5 @@ jobs:
         kubectl apply -f manifests
     - name: Test cloud shell
       run: |
-        sleep 20
+        pip3 install websockets
         python tests/basic.py
