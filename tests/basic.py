@@ -5,7 +5,7 @@ import json
 
 async def hello():
     loop = asyncio.get_running_loop()
-    async with websockets.connect("ws://localhost:8000") as ws:
+    async with websockets.connect("ws://localhost:8000/ws") as ws:
         print(await ws.recv())
         ready = False
         while ws.open:
