@@ -2,7 +2,7 @@
 Google cloud shell再現プロジェクト
 
 ## 環境変数
-- `RESOURCE_LIMIT_MEMORY` - シェルのメモリー
+- `MEMORY_LIMIT` - シェルのメモリー
 
 ## Testing
 ```
