@@ -90,7 +90,7 @@ async fn handle_socket(ws: WebSocket, client: Client) -> anyhow::Result<()> {
             spec: Some(PodSpec {
                 containers: vec![Container {
                     name: "shell".to_string(),
-                    image: Some("archlinux".to_string()),
+                    image: Some("ghcr.io/tuna2134/cloud-shell-arch".to_string()),
                     command: Some(vec!["sleep".to_string(), "infinity".to_string()]),
                     resources: Some(ResourceRequirements {
                         limits: Some(resource_limits),
@@ -132,7 +132,7 @@ async fn handle_socket(ws: WebSocket, client: Client) -> anyhow::Result<()> {
     let mut attached = pods
         .exec(
             &pod_name,
-            vec!["/bin/bash"],
+            vec!["/bin/zsh"],
             &AttachParams {
                 tty: true,
                 stdin: true,
