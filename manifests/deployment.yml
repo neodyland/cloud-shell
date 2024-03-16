@@ -26,3 +26,5 @@ spec:
         - name: RUST_LOG
           value: debug
       serviceAccountName: cloud-shell-service-account
+      imagePullSecrets:
+      - name: ghcr-tn23
