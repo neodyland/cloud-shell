@@ -8,3 +8,7 @@ Google cloud shell再現プロジェクト
 ```
 kubectl port-forward svc/cloud-shell-service -n shell 8000:8000
 ```
+
+```
+kubectl patch svc cloud-shell-service -n shell -p '{"spec": {"type": "LoadBalancer"}}'
+```
