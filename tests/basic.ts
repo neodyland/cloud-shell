@@ -9,7 +9,6 @@ ws.on('open', function open() {
 });
 
 ws.on('message', function message(data) {
-  console.log('received: %s', data);
   const payload = JSON.parse(data);
   if (payload.op === 2) {
     ws.send(JSON.stringify({
