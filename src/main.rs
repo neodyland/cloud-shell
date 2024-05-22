@@ -1,5 +1,14 @@
 use std::{collections::BTreeMap, env};
 
+use axum::{
+    extract::{
+        ws::{Message, WebSocket},
+        State, WebSocketUpgrade,
+    },
+    response::IntoResponse,
+    routing::get,
+    Router,
+};
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use k8s_openapi::{
     api::core::v1::{Container, Pod, PodSpec, ResourceRequirements},
@@ -10,12 +19,8 @@ use kube::{
     core::{params::PostParams, subresource::AttachParams, WatchEvent},
     Api, Client, ResourceExt,
 };
-use tokio::{
-    io::AsyncWriteExt,
-    net::TcpListener,
-};
+use tokio::{io::AsyncWriteExt, net::TcpListener};
 use tracing_subscriber::{fmt::time::LocalTime, EnvFilter};
-use axum::{extract::{WebSocketUpgrade, State, ws::{WebSocket, Message}}, response::IntoResponse, routing::get, Router};
 
 mod types;
 
@@ -46,9 +51,11 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     let app = Router::new()
-        .route("/", get(|| async { "Hello, World!"}))
+        .route("/", get(|| async { "Hello, World!" }))
         .route("/ws", get(ws_handle))
-        .with_state(AppState { client: client.clone() });
+        .with_state(AppState {
+            client: client.clone(),
+        });
 
     axum::serve(listener, app).await?;
 
