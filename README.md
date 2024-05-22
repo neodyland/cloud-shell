@@ -1,6 +1,10 @@
 # cloud-shell
 Google cloud shell再現プロジェクト
 
+## Todo
+- [ ] - アカウント必須にする
+- [ ] - 帯域制限
+
 ## 環境変数
 - `MEMORY_LIMIT` - Shell memory
 
