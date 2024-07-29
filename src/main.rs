@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, env};
+use std::{env};
 
 use axum::{
     extract::{
@@ -6,7 +6,7 @@ use axum::{
         State, WebSocketUpgrade,
     },
     response::IntoResponse,
-    routing::{delete, get},
+    routing::{get},
     Router,
 };
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind("0.0.0.0:8000").await?;
     let client = Arc::new(Client::try_default().await?);
 
-    delete_all_pods(&client, "shell".to_string()).await;
+    delete_all_pods(&client, "shell".to_string()).await?;
 
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
