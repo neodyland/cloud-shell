@@ -35,6 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    needs: push-docker
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
