@@ -6,22 +6,18 @@ use axum::{
         State, WebSocketUpgrade,
     },
     response::IntoResponse,
-    routing::get,
+    routing::{delete, get},
     Router,
 };
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
-use k8s_openapi::{
-    api::core::v1::{Container, Pod, PodSpec, ResourceRequirements},
-    apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
-};
-use kube::{
-    api::WatchParams,
-    core::{params::PostParams, subresource::AttachParams, WatchEvent},
-    Api, Client, ResourceExt,
-};
+use kube::{core::subresource::AttachParams, Client};
+use std::sync::Arc;
 use tokio::{io::AsyncWriteExt, net::TcpListener};
 use tracing_subscriber::{fmt::time::LocalTime, EnvFilter};
 
+use manager::k8s::{delete_all_pods, Shell};
+
+mod manager;
 mod types;
 
 fn json_to_msg<T>(data: &T) -> anyhow::Result<Message>
@@ -34,7 +30,7 @@ where
 
 #[derive(Clone)]
 struct AppState {
-    client: Client,
+    client: Arc<Client>,
 }
 
 #[tokio::main]
@@ -48,13 +44,15 @@ async fn main() -> anyhow::Result<()> {
         .with_line_number(true)
         .init();
     let listener = TcpListener::bind("0.0.0.0:8000").await?;
-    let client = Client::try_default().await?;
+    let client = Arc::new(Client::try_default().await?);
+
+    delete_all_pods(&client, "shell".to_string()).await;
 
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .route("/ws", get(ws_handle))
         .with_state(AppState {
-            client: client.clone(),
+            client: Arc::clone(&client),
         });
 
     axum::serve(listener, app).await?;
@@ -63,16 +61,16 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn ws_handle(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| wrapper(socket, state.client))
+    ws.on_upgrade(move |socket| wrapper(socket, Arc::clone(&state.client)))
 }
 
-async fn wrapper(ws: WebSocket, client: Client) {
+async fn wrapper(ws: WebSocket, client: Arc<Client>) {
     if let Err(e) = handle_socket(ws, client).await {
         tracing::error!("{:?}", e);
     }
 }
 
-async fn handle_socket(ws: WebSocket, client: Client) -> anyhow::Result<()> {
+async fn handle_socket(ws: WebSocket, client: Arc<Client>) -> anyhow::Result<()> {
     let (mut write, mut read) = ws.split();
     write
         .send(json_to_msg(&types::HelloMessage {
@@ -80,65 +78,21 @@ async fn handle_socket(ws: WebSocket, client: Client) -> anyhow::Result<()> {
             data: "Hello, World!".to_string(),
         })?)
         .await?;
-    let pods: Api<Pod> = Api::namespaced(client, "shell");
-    let pod_name = format!("shell-pod-{}", uuid::Uuid::new_v4()).to_string();
-    let mut resource_limits = BTreeMap::new();
-    resource_limits.insert(
-        "memory".to_string(),
-        Quantity(env::var("MEMORY_LIMIT").unwrap_or("0.1Gi".to_string())),
-    );
-    pods.create(
-        &PostParams::default(),
-        &Pod {
-            metadata: ObjectMeta {
-                name: Some(pod_name.clone()),
-                ..Default::default()
-            },
-            spec: Some(PodSpec {
-                containers: vec![Container {
-                    name: "shell".to_string(),
-                    image: Some("ghcr.io/tuna2134/cloud-shell-arch".to_string()),
-                    command: Some(vec!["sleep".to_string(), "infinity".to_string()]),
-                    resources: Some(ResourceRequirements {
-                        limits: Some(resource_limits),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }],
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    )
-    .await?;
-    let wp = WatchParams::default()
-        .fields(&format!("metadata.name={}", pod_name))
-        .timeout(10);
-    let mut watch = pods.watch(&wp, "0").await?.boxed();
-    while let Some(status) = watch.try_next().await? {
-        match status {
-            WatchEvent::Added(pod) => {
-                tracing::info!("Added: {}", pod.name_any());
-            }
-            WatchEvent::Modified(pod) => {
-                tracing::info!("Modified: {:?}", pod.name_any());
-                let status = pod.status.as_ref().unwrap();
-                if status.phase.as_deref() == Some("Running") {
-                    tracing::info!("Pod is running");
-                    break;
-                }
-            }
-            _ => {}
-        }
-    }
+    let mut shell = Shell::builder(client)
+        .namespace("shell".to_string())
+        .memory_limit(env::var("MEMORY_LIMIT").unwrap_or("0.1Gi".to_string()))
+        .create()
+        .await?;
+    shell.wait_provisioning().await?;
     write
         .send(json_to_msg(&types::ReadyMessage { op: 2, data: None })?)
         .await?;
 
     tracing::debug!("Pod is running, attaching to it");
-    let mut attached = pods
+    let mut attached = shell
+        .pods
         .exec(
-            &pod_name,
+            &shell.get_pod_name(),
             vec!["/bin/zsh"],
             &AttachParams {
                 tty: true,
@@ -183,7 +137,7 @@ async fn handle_socket(ws: WebSocket, client: Client) -> anyhow::Result<()> {
             }
         }
     }
-    pods.delete(&pod_name, &Default::default()).await?;
+    shell.close().await?;
 
     Ok(())
 }
