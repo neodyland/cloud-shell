@@ -80,7 +80,7 @@ async fn handle_socket(ws: WebSocket, client: Arc<Client>) -> anyhow::Result<()>
         .await?;
     let mut shell = Shell::builder(client)
         .namespace("shell".to_string())
-        .memory_limit(env::var("MEMORY_LIMIT").unwrap_or("0.1Gi".to_string()))
+        .memory_limit(env::var("MEMORY_LIMIT").unwrap_or("0.5Gi".to_string()))
         .create()
         .await?;
     shell.wait_provisioning().await?;
