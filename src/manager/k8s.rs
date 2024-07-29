@@ -59,6 +59,9 @@ impl ShellBuilder {
         Ok(shell)
     }
 }
+
+const SHELL_IMAGE: &str = "ghcr.io/tuna2134/cloud-shell-arch";
+
 pub struct Shell {
     memory_limit: String,
     pod_id: String,
@@ -86,7 +89,7 @@ impl Shell {
                     spec: Some(PodSpec {
                         containers: vec![Container {
                             name: "shell".to_string(),
-                            image: Some("ghcr.io/tuna2134/cloud-shell-arch".to_string()),
+                            image: Some(SHELL_IMAGE.to_string()),
                             command: Some(vec!["sleep".to_string(), "infinity".to_string()]),
                             resources: Some(ResourceRequirements {
                                 limits: Some(resource_limits),
