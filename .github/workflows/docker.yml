@@ -66,6 +66,8 @@ jobs:
         echo "Ok"
         kubectl port-forward -n shell svc/cloud-shell-service 8000:8000
         sleep 5
+        kubectl get pod -n shell
+        curl localhost:8000
     - name: Run E2E test
       run: |
         pip install websockets
