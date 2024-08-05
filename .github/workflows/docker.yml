@@ -65,3 +65,8 @@ jobs:
         done
         echo "Ok"
         kubectl port-forward -n shell svc/cloud-shell-service 8000:8000
+        sleep 5
+    - name: Run E2E test
+      run: |
+        pip install pytest pytest-asyncio websockets
+        pytest -s --log-cli-level INFO
