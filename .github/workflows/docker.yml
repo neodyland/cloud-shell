@@ -64,3 +64,4 @@ jobs:
             sleep 5
         done
         echo "Ok"
+        kubectl port-forward -n shell svc/cloud-shell-service 8000:8000
