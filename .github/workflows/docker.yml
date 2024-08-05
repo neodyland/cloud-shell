@@ -68,5 +68,5 @@ jobs:
         sleep 5
     - name: Run E2E test
       run: |
-        pip install pytest pytest-asyncio websockets
-        pytest -s --log-cli-level INFO
+        pip install websockets
+        python3 tests/basic.py
