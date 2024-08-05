@@ -59,7 +59,7 @@ jobs:
             desired=$(kubectl -n shell get deployment $deployment -o jsonpath='{.spec.replicas}')
             if [ "$ready" == "$desired" ]; then
                echo "Deployment $deployment is ready!"
-               exit 0
+               break
             fi
             sleep 5
         done
