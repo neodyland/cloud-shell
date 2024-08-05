@@ -54,3 +54,13 @@ jobs:
       run: |
         kubectl create namespace shell
         kubectl apply -f manifests
+        while true; do
+            ready=$(kubectl -n shell get deployment $deployment -o jsonpath='{.status.readyReplicas}')
+            desired=$(kubectl -n shell get deployment $deployment -o jsonpath='{.spec.replicas}')
+            if [ "$ready" == "$desired" ]; then
+               echo "Deployment $deployment is ready!"
+               exit 0
+            fi
+            sleep 5
+        done
+        echo "Ok"
