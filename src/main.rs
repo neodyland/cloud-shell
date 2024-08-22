@@ -93,7 +93,7 @@ async fn handle_socket(ws: WebSocket, client: Arc<Client>) -> anyhow::Result<()>
         .pods
         .exec(
             &shell.get_pod_name(),
-            vec!["/bin/zsh"],
+            vec!["/bin/bash"],
             &AttachParams {
                 tty: true,
                 stdin: true,

@@ -60,7 +60,7 @@ impl ShellBuilder {
     }
 }
 
-const SHELL_IMAGE: &str = "ghcr.io/tuna2134/cloud-shell-arch";
+const SHELL_IMAGE: &str = "ubuntu";
 
 pub struct Shell {
     memory_limit: String,
@@ -87,6 +87,9 @@ impl Shell {
                         ..Default::default()
                     },
                     spec: Some(PodSpec {
+                        automount_service_account_token: Some(false),
+                        enable_service_links: Some(false),
+                        service_account_name: Some("no-service-env-vars".to_string()),
                         containers: vec![Container {
                             name: "shell".to_string(),
                             image: Some(SHELL_IMAGE.to_string()),
