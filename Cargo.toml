@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 axum = { version = "0.7.5", features = ["ws"] }
+ciborium = "0.2.2"
 dotenvy = "0.15.7"
 futures-util = "0.3.30"
 k8s-openapi = { version = "0.22.0", features = ["latest"] }
