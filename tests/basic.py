@@ -10,14 +10,13 @@ async def hello():
         ready = False
         while ws.open:
             data = json.loads(await ws.recv())
-            if data["op"] == 2:
+            if data["t"] == "Hello":
                 print("Ready")
-                await ws.send(json.dumps({
-                    "op": 3,
-                    "data": "uname -r && env && df -h\n"
-                }))
-            if data["op"] == 4:
-                print(data["data"])
+                await ws.send(
+                    json.dumps({"t": "Stdin", "c": "uname -r && env && df -h\n"})
+                )
+            elif data["t"] == "Stdout" or data["t"] == "Stderr":
+                print(data["c"])
 
 
 asyncio.run(hello())

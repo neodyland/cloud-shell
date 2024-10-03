@@ -10,12 +10,12 @@ ws.on('open', function open() {
 
 ws.on('message', function message(data) {
   const payload = JSON.parse(data);
-  if (payload.op === 2) {
+  if (payload.t === "Ready") {
     ws.send(JSON.stringify({
-      op: 3,
-      data: "pacman -Syyu --noconfirm",
-    });
-  } else if (payload.op === 4) {
-    console.log(payload.data);
+      t: "Stdin",
+      c: "pacman -Syyu --noconfirm",
+    }));
+  } else if (payload.t === "Stdout" || payload.t === "Stderr") {
+    console.log(payload.c);
   };
 });

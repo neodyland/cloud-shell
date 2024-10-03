@@ -1,4 +1,4 @@
-use std::{env};
+use std::{env, io::Cursor};
 
 use axum::{
     extract::{
@@ -6,7 +6,7 @@ use axum::{
         State, WebSocketUpgrade,
     },
     response::IntoResponse,
-    routing::{get},
+    routing::get,
     Router,
 };
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
@@ -15,17 +15,15 @@ use std::sync::Arc;
 use tokio::{io::AsyncWriteExt, net::TcpListener};
 use tracing_subscriber::{fmt::time::LocalTime, EnvFilter};
 
-use manager::k8s::{delete_all_pods, Shell};
+use cloud_shell::manager::k8s::{delete_all_pods, Shell};
 
-mod manager;
-mod types;
-
-fn json_to_msg<T>(data: &T) -> anyhow::Result<Message>
+fn data_to_msg<T>(data: &T) -> anyhow::Result<Message>
 where
     T: ?Sized + serde::Serialize,
 {
-    let msg = serde_json::to_string(&data)?;
-    Ok(Message::Text(msg))
+    let mut w = vec![];
+    ciborium::into_writer(&data, &mut w)?;
+    Ok(Message::Binary(w))
 }
 
 #[derive(Clone)]
@@ -35,7 +33,6 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing::info!("Now booting...");
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
         .with_timer(LocalTime::rfc_3339())
@@ -43,7 +40,9 @@ async fn main() -> anyhow::Result<()> {
         .with_file(true)
         .with_line_number(true)
         .init();
-    let listener = TcpListener::bind("0.0.0.0:8000").await?;
+    tracing::info!("Now booting...");
+    let addr = env::var("ADDR").unwrap_or("0.0.0.0:8000".to_string());
+    let listener = TcpListener::bind(addr).await?;
     let client = Arc::new(Client::try_default().await?);
 
     delete_all_pods(&client, "shell".to_string()).await?;
@@ -73,10 +72,9 @@ async fn wrapper(ws: WebSocket, client: Arc<Client>) {
 async fn handle_socket(ws: WebSocket, client: Arc<Client>) -> anyhow::Result<()> {
     let (mut write, mut read) = ws.split();
     write
-        .send(json_to_msg(&types::HelloMessage {
-            op: 1,
-            data: "Hello, World!".to_string(),
-        })?)
+        .send(data_to_msg(&cloud_shell::types::ServerMessage::Hello(
+            "Hello, World!".to_string(),
+        ))?)
         .await?;
     let mut shell = Shell::builder(client)
         .namespace("shell".to_string())
@@ -85,7 +83,9 @@ async fn handle_socket(ws: WebSocket, client: Arc<Client>) -> anyhow::Result<()>
         .await?;
     shell.wait_provisioning().await?;
     write
-        .send(json_to_msg(&types::ReadyMessage { op: 2, data: None })?)
+        .send(data_to_msg(&cloud_shell::types::ServerMessage::Ready(
+            None,
+        ))?)
         .await?;
 
     tracing::debug!("Pod is running, attaching to it");
@@ -109,20 +109,17 @@ async fn handle_socket(ws: WebSocket, client: Arc<Client>) -> anyhow::Result<()>
             msg = read.next() => {
                 tracing::debug!("Received message: {:?}", msg);
                 let msg = match msg {
-                    Some(Ok(Message::Text(msg))) => msg,
+                    Some(Ok(Message::Binary(msg))) => msg,
                     Some(Ok(Message::Close(_))) => break,
                     None => break,
                     _ => continue,
                 };
-                let msg: serde_json::Value = serde_json::from_str(&msg)?;
-                let op = msg["op"].as_u64().unwrap();
-                match op {
-                    3 => {
-                        tracing::debug!("Running command: {:?}", msg["data"]);
-                        let data = msg["data"].as_str().unwrap_or("");
-                        stdin_writer.write_all(data.as_bytes()).await?;
+                let msg: cloud_shell::types::ClientMessage = ciborium::from_reader(Cursor::new(msg))?;
+                match msg {
+                    cloud_shell::types::ClientMessage::Stdin(data) => {
+                        tracing::debug!("Running command: {:?}",data);
+                        stdin_writer.write_all(&data).await?;
                     }
-                    _ => {}
                 }
             }
             stdout = stdout_stream.try_next() => {
@@ -130,10 +127,7 @@ async fn handle_socket(ws: WebSocket, client: Arc<Client>) -> anyhow::Result<()>
                     Ok(Some(stdout)) => stdout,
                     _ => break,
                 };
-                write.send(json_to_msg(&types::RunCommandMessage {
-                    op: 4,
-                    data: String::from_utf8_lossy(&stdout).to_string(),
-                })?).await?;
+                write.send(data_to_msg(&cloud_shell::types::ServerMessage::Stdout(stdout.to_vec()))?).await?;
             }
         }
     }
